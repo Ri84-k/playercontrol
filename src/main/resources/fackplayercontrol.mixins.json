@@ -1,0 +1,16 @@
+{
+	"required": true,
+	"package": "ml.mypals.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"PlayerAccessor",
+		"TrackedEntityAccessor",
+		"compat.carpet.FakePlayerMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

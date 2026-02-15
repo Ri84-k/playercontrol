@@ -1,0 +1,32 @@
+{
+	"schemaVersion": 1,
+	"id": "fackplayercontrol",
+	"version": "${version}",
+	"name": "FackPlayerControl",
+	"description": "This is an example description! Tell everyone what your mod is about!",
+	"accessWidener" : "playercontrol.accesswidener",
+	"authors": [
+		"Me!"
+	],
+	"contact": {
+		"homepage": "https://fabricmc.net/",
+		"sources": "https://github.com/FabricMC/fabric-example-mod"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/fackplayercontrol/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"ml.mypals.PlayerControl"
+		]
+	},
+	"mixins": [
+		"fackplayercontrol.mixins.json"
+	],
+	"depends": {
+		"fabricloader": "*",
+		"minecraft": "~1.21",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

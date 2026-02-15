@@ -1,0 +1,23 @@
+{
+  "controlplayer.error.player_only": "Can only be executed by a player!",
+  "controlplayer.error.target_not_found": "Cannot find target player!",
+  "controlplayer.error.self_swap": "Can't swap with yourself!",
+  "controlplayer.error.already_swapped": "%s is already in a swap, please release first.",
+  "controlplayer.error.not_swapped": "Not swapping with anyone.",
+  "controlplayer.error.original_missing": "Original state for initiator is missing.",
+
+  "controlplayer.swap.success": "You swapped with %s. You are now %s!",
+  "controlplayer.swap.done": "Swapped!",
+
+  "controlplayer.release.success": "Swap released! Welcome back.",
+  "controlplayer.release.force_success": "Force released %s!",
+
+  "controlplayer.partner_offline_restored": "Swap partner went offline, your original identity has been restored.",
+
+  "controlplayer.list.empty": "Not swapping with anyone.",
+  "controlplayer.list.header": "--- Active Swaps ---",
+  "controlplayer.list.entry": "  |- %s & %s",
+
+  "controlplayer.status.none": "Not swapping with anyone!",
+  "controlplayer.status.partner": "You are swapping with %s!"
+}
