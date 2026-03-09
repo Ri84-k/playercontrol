@@ -1,4 +1,4 @@
-package ml.mypals.core;
+package ml.mypals.controlPlayer.core;
 
 import com.mojang.authlib.GameProfile;
 import net.minecraft.network.chat.Component;
@@ -37,6 +37,9 @@ public class PlayerSwapManager {
         snapB.applyTo(playerA, snapB.gameProfile);
         snapA.applyTo(playerB, snapA.gameProfile);
 
+        playerA.getServer().getPlayerList().sendPlayerPermissionLevel(playerA);
+        playerB.getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
+
         return SwapResult.success(Component.empty());
     }
 
@@ -74,6 +77,10 @@ public class PlayerSwapManager {
             currentA.applyTo(playerB, profileForB);
         }
 
+
+        initiator.getServer().getPlayerList().sendPlayerPermissionLevel(initiator);
+        playerB.getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
+
         return SwapResult.success(Component.empty());
     }
 
@@ -100,6 +107,9 @@ public class PlayerSwapManager {
             origB.applyTo(playerB, origB.gameProfile);
             playerB.sendSystemMessage(Component.translatable("controlplayer.partner_offline_restored"));
         }
+
+        playerB.getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
+
         return SwapResult.success(Component.empty());
     }
 

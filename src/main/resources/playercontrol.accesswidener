@@ -4,3 +4,4 @@ accessible class net/minecraft/server/level/ChunkMap$TrackedEntity
 accessible field net/minecraft/stats/StatsCounter stats Lit/unimi/dsi/fastutil/objects/Object2IntMap;
 accessible field net/minecraft/server/level/ServerPlayer stats Lnet/minecraft/stats/ServerStatsCounter;
 accessible field net/minecraft/server/level/ChunkMap entityMap Lit/unimi/dsi/fastutil/ints/Int2ObjectMap;
+accessible method net/minecraft/server/players/PlayerList sendPlayerPermissionLevel (Lnet/minecraft/server/level/ServerPlayer;I)V

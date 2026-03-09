@@ -1,13 +1,15 @@
-package ml.mypals;
+package ml.mypals.controlPlayer;
 
-import ml.mypals.command.PlayerControlCommand;
-import ml.mypals.core.PlayerSwapManager;
+import ml.mypals.controlPlayer.command.PlayerControlCommand;
+import ml.mypals.controlPlayer.core.ModGameRules;
+import ml.mypals.controlPlayer.core.PlayerSwapManager;
 import net.fabricmc.api.ModInitializer;
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.GameRules;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,13 +18,13 @@ import java.util.UUID;
 
 public class PlayerControl implements ModInitializer {
 	public static final String MOD_ID = "fackplayercontrol";
-
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
 	private static final PlayerSwapManager swapManager = new PlayerSwapManager();
 
 	@Override
 	public void onInitialize() {
+		ModGameRules.init();
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
 				new PlayerControlCommand(swapManager).register(dispatcher)
 		);

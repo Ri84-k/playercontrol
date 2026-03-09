@@ -1,7 +1,7 @@
-package ml.mypals.core;
+package ml.mypals.controlPlayer.core;
 
 import com.mojang.authlib.GameProfile;
-import ml.mypals.skin.PlayerSkinRefresher;
+import ml.mypals.controlPlayer.skin.PlayerSkinRefresher;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -157,7 +157,7 @@ public class SwapSnapshot {
         Entity v = player.getVehicle();
         if (v != null) b.vehicle = v.getUUID();
         b.passengers = player.getPassengers().stream().map(Entity::getUUID).toList();
-        if(player.isSleeping())b.isAsleep = player.getOnPos();
+        if(player.isSleeping() && player.getSleepingPos().isPresent())b.isAsleep = player.getSleepingPos().get();
 
         List<SynchedEntityData.DataValue<?>> rawValues = player.getEntityData().getNonDefaultValues();
         if (rawValues != null) {
@@ -205,7 +205,6 @@ public class SwapSnapshot {
 
         applyRiding(player);
         if (isAsleep != null) {
-            player.setSleepingPos(isAsleep);
             player.startSleepInBed(isAsleep);
         } else {
             player.clearSleepingPos();

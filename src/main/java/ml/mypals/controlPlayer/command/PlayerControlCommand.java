@@ -1,9 +1,9 @@
-package ml.mypals.command;
+package ml.mypals.controlPlayer.command;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
-import ml.mypals.core.PlayerSwapManager;
+import ml.mypals.controlPlayer.core.PlayerSwapManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;

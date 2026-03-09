@@ -1,15 +1,9 @@
-package ml.mypals.mixin.compat.carpet;
+package ml.mypals.controlPlayer.mixin.compat.carpet;
 
 import carpet.patches.EntityPlayerMPFake;
 import com.mojang.authlib.GameProfile;
-import ml.mypals.PlayerControl;
-import ml.mypals.command.PlayerControlCommand;
-import net.minecraft.network.DisconnectionDetails;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ComponentContents;
-import net.minecraft.network.chat.contents.TranslatableContents;
+import ml.mypals.controlPlayer.PlayerControl;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ClientInformation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -27,7 +21,6 @@ public abstract class FakePlayerMixin extends ServerPlayer {
 
     @Inject(
             method = "kill()V",
-            cancellable = true,
             at = @At("HEAD")
     )  public void kill(CallbackInfo ci) {
         if(PlayerControl.getSwapManager().isSwapped(this.getUUID())){

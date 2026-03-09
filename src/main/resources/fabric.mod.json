@@ -17,7 +17,7 @@
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"ml.mypals.PlayerControl"
+			"ml.mypals.controlPlayer.PlayerControl"
 		]
 	},
 	"mixins": [

@@ -1,4 +1,4 @@
-package ml.mypals.mixin;
+package ml.mypals.controlPlayer.mixin;
 
 import com.mojang.authlib.GameProfile;
 import net.minecraft.world.entity.player.Player;

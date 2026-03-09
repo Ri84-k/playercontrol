@@ -1,4 +1,4 @@
-package ml.mypals.mixin;
+package ml.mypals.controlPlayer.mixin;
 
 
 import net.minecraft.server.level.ChunkMap;

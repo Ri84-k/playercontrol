@@ -1,10 +1,10 @@
-package ml.mypals.skin;
+package ml.mypals.controlPlayer.skin;
 
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import com.mojang.authlib.properties.PropertyMap;
-import ml.mypals.mixin.PlayerAccessor;
-import ml.mypals.mixin.TrackedEntityAccessor;
+import ml.mypals.controlPlayer.mixin.PlayerAccessor;
+import ml.mypals.controlPlayer.mixin.TrackedEntityAccessor;
 import net.minecraft.network.protocol.game.*;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
