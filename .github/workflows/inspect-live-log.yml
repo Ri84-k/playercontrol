@@ -1,0 +1,47 @@
+name: Inspect shared Minecraft log (temporary)
+on:
+  push:
+    branches: [fabric-26.2]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Review PlayerControl events and errors in provided mclo.gs log
+        shell: bash
+        env:
+          MCLOG_URL: https://api.mclo.gs/1/raw/laHK158
+        run: |
+          python3 - <<'PY'
+          import os, re, urllib.request
+          req=urllib.request.Request(os.environ["MCLOG_URL"],headers={"User-Agent":"PlayerControl-diagnostics/1.0"})
+          with urllib.request.urlopen(req,timeout=20) as f:
+              raw=f.read(10000001)
+          if len(raw)>10000000:
+              raise RuntimeError("Log too large")
+          lines=raw.decode("utf-8","replace").splitlines()
+          print("Log lines:",len(lines))
+          def safe(s):
+              s=re.sub(r"(?i)(?:\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b)","[UUID]",s)
+              s=re.sub(r"(?<![\\w.])(?:\\d{1,3}\\.){3}\\d{1,3}(?![\\w.])","[IP]",s)
+              return s[:550]
+          key=re.compile(r"fackplayercontrol|playercontrol|TestBOT|testbot|swap|release|disconnect|left the game|joined the game|died|killed|death|unsupportedoperationexception|rollback",re.I)
+          error=re.compile(r"\\b(?:ERROR|FATAL)\\b|Exception|Caused by:|MixinApplyError|CRASH|Failed to",re.I)
+          hits=[i for i,l in enumerate(lines) if key.search(l)]
+          errs=[i for i,l in enumerate(lines) if error.search(l)]
+          print("PlayerControl/related hits:",len(hits),"error/exception mentions:",len(errs))
+          for label,indices,before,after,max_events in [("SWAP EVENTS",hits,2,9,65),("ERROR EVENTS",errs,2,8,40)]:
+              print("----",label,"----")
+              seen=set()
+              for i in indices[-max_events:]:
+                  for z in range(max(0,i-before),min(len(lines),i+after+1)):
+                      if z not in seen:
+                          seen.add(z)
+                          print(str(z+1)+": "+safe(lines[z]))
+          print("---- LAST LOG LINES ----")
+          for i,l in list(enumerate(lines))[-55:]:
+              print(str(i+1)+": "+safe(l))
+          PY
