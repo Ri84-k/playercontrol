@@ -106,7 +106,25 @@ def main() -> None:
         if amount not in result or "found" not in result.lower():
             raise RuntimeError(f"Inventory item check failed {description}: {result!r}")
 
-    print("Carpet fake-player spawn, swap, release, status and inventory state checks passed.", flush=True)
+    # Validate the Carpet commands exposed by the new Spawn Player / Actions UI.
+    rcon.command("player MenuBot spawn")
+    deadline = time.monotonic() + 35
+    while "MenuBot" not in rcon.command("list"):
+        if time.monotonic() > deadline:
+            raise RuntimeError("New fake player was not created by /player MenuBot spawn")
+        time.sleep(2)
+    for action in ("attack once", "use once", "jump once", "move forward", "stop"):
+        result = rcon.command(f"player MenuBot {action}")
+        if any(fragment in result.lower() for fragment in bad):
+            raise RuntimeError(f"Carpet action {action!r} returned an error: {result!r}")
+    rcon.command("player MenuBot kill")
+    deadline = time.monotonic() + 35
+    while "MenuBot" in rcon.command("list"):
+        if time.monotonic() > deadline:
+            raise RuntimeError("Fake player still connected after /player MenuBot kill")
+        time.sleep(2)
+
+    print("Carpet fake-player spawn, swap, release, status, inventory and manager actions passed.", flush=True)
 
 
 if __name__ == "__main__":
