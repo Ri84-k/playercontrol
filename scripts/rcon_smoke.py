@@ -81,8 +81,15 @@ def main() -> None:
     bad = ("unknown or incomplete command", "an unexpected error", "could not execute")
     for name, output in (("initial status", before), ("swap", swapped), ("swapped status", after),
                          ("release", restored), ("restored status", final)):
-        if not output.strip() or any(fragment in output.lower() for fragment in bad):
-            raise RuntimeError(f"{name} failed: {output!r}")
+        if any(fragment in output.lower() for fragment in bad):
+            raise RuntimeError(f"{name} returned an error: {output!r}")
+
+    # Release sends feedback directly to the acting player rather than RCON.
+    # Validate the resulting swap state, not whether release printed a message.
+    if "Not swapping with anyone!" not in before or "Not swapping with anyone!" not in final:
+        raise RuntimeError("Players did not start/end in the unswapped state")
+    if "Swapped!" not in swapped or "TestBotB" not in after:
+        raise RuntimeError("Swap was not confirmed by the command/status output")
 
     print("Carpet fake-player spawn, swap, release and status commands completed.", flush=True)
 
