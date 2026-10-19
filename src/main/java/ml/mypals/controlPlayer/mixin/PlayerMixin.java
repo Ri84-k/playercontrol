@@ -25,7 +25,7 @@ public abstract class PlayerMixin extends LivingEntity {
     public void getName(CallbackInfoReturnable<Component> cir) {
         String origin = cir.getReturnValue().getString();
         if(((Player)(Object)this) instanceof ServerPlayer serverPlayer){
-            MinecraftServer server = serverPlayer.getServer();
+            MinecraftServer server = serverPlayer.level().getServer();
             if(serverPlayer.level().getGameRules().get(ModGameRules.SHOW_PERFIX)){
                 if(PlayerControl.getSwapManager().isSwapped(this.getUUID())){
                     PlayerControl.getSwapManager().getSwapPartner(this.uuid).ifPresent(p -> {
