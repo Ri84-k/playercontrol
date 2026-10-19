@@ -72,11 +72,17 @@ def main() -> None:
             raise RuntimeError("Carpet did not spawn both fake players")
         time.sleep(3)
 
+    # Each fake player gets a distinct item to check inventory ownership.
+    rcon.command("item replace entity TestBotA hotbar.0 with minecraft:diamond 3")
+    rcon.command("item replace entity TestBotB hotbar.0 with minecraft:emerald 5")
+    initial_items = rcon.command("clear TestBotA minecraft:diamond 0")
     before = rcon.command("execute as TestBotA run controlPlayer status")
     swapped = rcon.command("execute as TestBotA run controlPlayer swap TestBotB")
     after = rcon.command("execute as TestBotA run controlPlayer status")
+    swapped_items = rcon.command("clear TestBotA minecraft:emerald 0")
     restored = rcon.command("execute as TestBotA run controlPlayer release")
     final = rcon.command("execute as TestBotA run controlPlayer status")
+    restored_items = rcon.command("clear TestBotA minecraft:diamond 0")
 
     bad = ("unknown or incomplete command", "an unexpected error", "could not execute")
     for name, output in (("initial status", before), ("swap", swapped), ("swapped status", after),
@@ -90,8 +96,13 @@ def main() -> None:
         raise RuntimeError("Players did not start/end in the unswapped state")
     if "Swapped!" not in swapped or "TestBotB" not in after:
         raise RuntimeError("Swap was not confirmed by the command/status output")
+    for description, result, amount in (("before swap", initial_items, "3"),
+                                        ("during swap", swapped_items, "5"),
+                                        ("after release", restored_items, "3")):
+        if amount not in result or "found" not in result.lower():
+            raise RuntimeError(f"Inventory item check failed {description}: {result!r}")
 
-    print("Carpet fake-player spawn, swap, release and status commands completed.", flush=True)
+    print("Carpet fake-player spawn, swap, release, status and inventory state checks passed.", flush=True)
 
 
 if __name__ == "__main__":
