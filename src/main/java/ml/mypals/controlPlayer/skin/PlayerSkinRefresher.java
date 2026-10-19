@@ -35,8 +35,7 @@ public class PlayerSkinRefresher {
             newMap.put(TEXTURES_KEY, texProp);
         }
 
-        GameProfile applied = new GameProfile(current.id(), newProfile.name());
-        applied.properties().putAll(newMap);
+        GameProfile applied = new GameProfile(current.id(), newProfile.name(), newMap);
         ((PlayerAccessor) player).setGameProfile(applied);
 
         PlayerList playerList = Objects.requireNonNull(player.level().getServer()).getPlayerList();
