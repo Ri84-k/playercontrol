@@ -3,6 +3,7 @@ package ml.mypals.controlPlayer;
 import ml.mypals.controlPlayer.command.PlayerControlCommand;
 import ml.mypals.controlPlayer.core.ModGameRules;
 import ml.mypals.controlPlayer.core.PlayerSwapManager;
+import ml.mypals.controlPlayer.net.FakePlayerMenuPackets;
 import net.fabricmc.api.ModInitializer;
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -24,6 +25,7 @@ public class PlayerControl implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		ModGameRules.init();
+		FakePlayerMenuPackets.register();
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
 				new PlayerControlCommand(swapManager).register(dispatcher)
 		);
