@@ -23,6 +23,39 @@ jobs:
         run: chmod +x ./gradlew
       - name: build
         run: ./gradlew build --stacktrace
+      - name: server startup smoke test
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          mkdir -p run
+          echo 'eula=true' > run/eula.txt
+          ./gradlew runServer --console=plain > server-startup.log 2>&1 &
+          gradle_pid=$!
+          trap 'kill "$gradle_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 150); do
+            if grep -qE 'Done \\([0-9.,]+s\\)!' server-startup.log; then
+              echo "Minecraft server reported successful startup"
+              tail -n 70 server-startup.log
+              exit 0
+            fi
+            if ! kill -0 "$gradle_pid" 2>/dev/null; then
+              echo "Server process ended before startup"
+              tail -n 150 server-startup.log
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "Server startup timed out"
+          tail -n 150 server-startup.log
+          exit 1
+      - name: capture server startup log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ServerStartupLog
+          path: server-startup.log
+          if-no-files-found: ignore
       - name: capture build artifacts
         uses: actions/upload-artifact@v4
         with:
