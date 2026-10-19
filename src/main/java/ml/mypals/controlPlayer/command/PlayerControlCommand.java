@@ -29,16 +29,16 @@ public class PlayerControlCommand {
     public void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("controlPlayer")
                 .then(Commands.literal("swap")
-                        .requires(src -> src.hasPermission(2))
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                         .then(Commands.argument("player", EntityArgument.player())
                                 .executes(this::swapPlayers)))
                 .then(Commands.literal("release")
                         .executes(this::releaseSelf)
                         .then(Commands.argument("player", EntityArgument.player())
-                                .requires(src -> src.hasPermission(2))
+                                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                                 .executes(this::releaseTarget)))
                 .then(Commands.literal("list")
-                        .requires(src -> src.hasPermission(2))
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                         .executes(this::listSwaps))
                 .then(Commands.literal("status")
                         .executes(this::showStatus))
@@ -140,7 +140,7 @@ public class PlayerControlCommand {
             ctx.getSource().sendSuccess(() -> Component.translatable("controlplayer.status.none").withStyle(ChatFormatting.GRAY), false);
         } else {
             manager.getSwapPartner(player.getUUID()).ifPresent(partnerUid -> {
-                String partnerName = resolveName(Objects.requireNonNull(player.getServer()), partnerUid);
+                String partnerName = resolveName(player.level().getServer(), partnerUid);
                 ctx.getSource().sendSuccess(() ->
                         Component.translatable("controlplayer.status.partner", partnerName).withStyle(ChatFormatting.AQUA), false);
             });
@@ -152,7 +152,6 @@ public class PlayerControlCommand {
         ServerPlayer p = server.getPlayerList().getPlayer(uid);
         if (p != null) return p.getName().getString();
 
-        Optional<GameProfile> profile = Objects.requireNonNull(server.getProfileCache()).get(uid);
-        return profile.map(com.mojang.authlib.GameProfile::getName).orElse(uid.toString());
+        return uid.toString();
     }
 }
