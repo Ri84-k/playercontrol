@@ -5,3 +5,5 @@ accessible field net/minecraft/stats/StatsCounter stats Lit/unimi/dsi/fastutil/o
 accessible field net/minecraft/server/level/ServerPlayer stats Lnet/minecraft/stats/ServerStatsCounter;
 accessible field net/minecraft/server/level/ChunkMap entityMap Lit/unimi/dsi/fastutil/ints/Int2ObjectMap;
 accessible method net/minecraft/server/players/PlayerList sendPlayerPermissionLevel (Lnet/minecraft/server/level/ServerPlayer;I)V
+accessible method net/minecraft/server/level/ServerPlayer addAdditionalSaveData (Lnet/minecraft/world/level/storage/ValueOutput;)V
+accessible method net/minecraft/server/level/ServerPlayer readAdditionalSaveData (Lnet/minecraft/world/level/storage/ValueInput;)V
