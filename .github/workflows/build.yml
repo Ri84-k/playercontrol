@@ -34,7 +34,7 @@ jobs:
           gradle_pid=$!
           trap 'kill "$gradle_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 150); do
-            if grep -qE 'Done \\([0-9.,]+s\\)!' server-startup.log; then
+            if grep -Fq 'Done (' server-startup.log; then
               echo "Minecraft server reported successful startup"
               tail -n 70 server-startup.log
               exit 0
