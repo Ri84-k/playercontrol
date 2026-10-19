@@ -6,7 +6,7 @@ import ml.mypals.controlPlayer.PlayerControl;
 import ml.mypals.controlPlayer.core.ModGameRules;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.PermissionSet;
+import net.minecraft.server.permissions.LevelBasedPermissionSet;
 import net.minecraft.server.players.NameAndId;
 import net.minecraft.server.players.PlayerList;
 import net.minecraft.world.level.gamerules.GameRules;
@@ -21,8 +21,8 @@ public abstract class PlayerPermissionMixin {
     @Shadow public abstract GameRules getGameRules();
 
     @WrapMethod(method = "getProfilePermissions")
-    private PermissionSet playercontrol$permissions(NameAndId profile, Operation<PermissionSet> original) {
-        PermissionSet own = original.call(profile);
+    private LevelBasedPermissionSet playercontrol$permissions(NameAndId profile, Operation<LevelBasedPermissionSet> original) {
+        LevelBasedPermissionSet own = original.call(profile);
         // Swapped users normally keep permission levels attached to their real UUID.
         if (!this.getGameRules().get(ModGameRules.PERMISSION_SWAP)) return own;
         UUID other = PlayerControl.getSwapManager().getSwapPartner(profile.id()).orElse(null);
