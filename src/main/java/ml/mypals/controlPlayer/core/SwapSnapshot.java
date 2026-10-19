@@ -4,9 +4,12 @@ import com.mojang.authlib.GameProfile;
 import ml.mypals.controlPlayer.skin.PlayerSkinRefresher;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.TagValueOutput;
+import java.util.Set;
 import net.minecraft.network.chat.RemoteChatSession;
-import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,25 +37,20 @@ public class SwapSnapshot {
     public final ServerStatsCounter stats;
     public final HumanoidArm mainArm;
     public final ServerGamePacketListenerImpl connection;
-    public final boolean noCulling;
     public final List<UUID> passengers;
     public final UUID vehicle;
     public final RemoteChatSession chatSession;
-    public final ListTag attributes;
+    public final List<AttributeInstance.Packed> attributes;
     public final Abilities abilities;
     public final ServerLevel level;
     public final double x, y, z;
     public final BlockPos isAsleep;
     public final float yRot, xRot;
-    public final List<ItemStack> mainInventory;
-    public final List<ItemStack> armorInventory;
-    public final List<ItemStack> offhandInventory;
+    public final List<ItemStack> inventoryItems;
     public final List<ItemStack> enderChest;
     public final int selectedSlot;
     public final float health;
-    public final int foodLevel;
-    public final float saturationLevel;
-    public final float exhaustionLevel;
+    public final CompoundTag foodData;
     public final int experienceLevel;
     public final float experienceProgress;
     public final int totalExperience;
@@ -70,15 +68,11 @@ public class SwapSnapshot {
         this.z = b.z;
         this.yRot = b.yRot;
         this.xRot = b.xRot;
-        this.mainInventory = b.mainInventory;
-        this.armorInventory = b.armorInventory;
-        this.offhandInventory = b.offhandInventory;
+        this.inventoryItems = b.inventoryItems;
         this.enderChest = b.enderChest;
         this.selectedSlot = b.selectedSlot;
         this.health = b.health;
-        this.foodLevel = b.foodLevel;
-        this.saturationLevel = b.saturationLevel;
-        this.exhaustionLevel = b.exhaustionLevel;
+        this.foodData = b.foodData;
         this.experienceLevel = b.experienceLevel;
         this.experienceProgress = b.experienceProgress;
         this.totalExperience = b.totalExperience;
@@ -89,7 +83,6 @@ public class SwapSnapshot {
         this.stats = b.stats;
         this.mainArm = b.mainArm;
         this.connection = b.connection;
-        this.noCulling = b.noCulling;
         this.chatSession = b.chatSession;
         this.abilities = b.abilities;
         this.isAsleep = b.isAsleep;
@@ -107,7 +100,6 @@ public class SwapSnapshot {
         b.stats = player.getStats();
         b.mainArm = player.getMainArm();
         b.connection = player.connection;
-        b.noCulling = player.noCulling;
         b.chatSession = player.getChatSession();
 
         Abilities src = player.getAbilities();
@@ -120,20 +112,19 @@ public class SwapSnapshot {
         abCopy.setFlyingSpeed(src.getFlyingSpeed());
         b.abilities = abCopy;
 
-        b.attributes = player.getAttributes().save();
+        b.attributes = player.getAttributes().pack();
 
         b.gameProfile = player.getGameProfile();
-        b.level = player.serverLevel();
+        b.level = player.level();
         b.x = player.getX();
         b.y = player.getY();
         b.z = player.getZ();
         b.yRot = player.getYRot();
         b.xRot = player.getXRot();
 
-        b.mainInventory = copyItemsFrom(player.getInventory().items);
-        b.armorInventory = copyItemsFrom(player.getInventory().armor);
-        b.offhandInventory = copyItemsFrom(player.getInventory().offhand);
-        b.selectedSlot = player.getInventory().selected;
+        // Minecraft 26.2 inventory stores worn equipment outside its private main-item list.
+        b.inventoryItems = copyInventory(player);
+        b.selectedSlot = player.getInventory().getSelectedSlot();
         b.enderChest = new ArrayList<>();
         var ec = player.getEnderChestInventory();
         for (int i = 0; i < ec.getContainerSize(); i++) {
@@ -142,9 +133,9 @@ public class SwapSnapshot {
 
         b.health = player.getHealth();
         FoodData food = player.getFoodData();
-        b.foodLevel = food.getFoodLevel();
-        b.saturationLevel = food.getSaturationLevel();
-        b.exhaustionLevel = food.getExhaustionLevel();
+        TagValueOutput foodOutput = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, player.registryAccess());
+        food.addAdditionalSaveData(foodOutput);
+        b.foodData = foodOutput.buildResult();
         b.experienceLevel = player.experienceLevel;
         b.experienceProgress = player.experienceProgress;
         b.totalExperience = player.totalExperience;
@@ -161,16 +152,14 @@ public class SwapSnapshot {
 
         List<SynchedEntityData.DataValue<?>> rawValues = player.getEntityData().getNonDefaultValues();
         if (rawValues != null) {
-            b.entityData = rawValues.stream()
-                    .filter(v2 -> v2.serializer() != EntityDataSerializers.OPTIONAL_UUID)
-                    .toList();
+            b.entityData = List.copyOf(rawValues);
         } else {
             b.entityData = List.of();
         }
 
-        CompoundTag additionalTag = new CompoundTag();
-        player.addAdditionalSaveData(additionalTag);
-        b.additionalData = additionalTag;
+        TagValueOutput additionalOutput = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, player.registryAccess());
+        player.addAdditionalSaveData(additionalOutput);
+        b.additionalData = additionalOutput.buildResult();
 
         return new SwapSnapshot(b);
     }
@@ -181,9 +170,7 @@ public class SwapSnapshot {
         applyEnderChest(player);
         player.setHealth(health);
         FoodData food = player.getFoodData();
-        food.setFoodLevel(foodLevel);
-        food.setSaturation(saturationLevel);
-        food.setExhaustion(exhaustionLevel);
+        food.readAdditionalSaveData(TagValueInput.create(ProblemReporter.DISCARDING, player.registryAccess(), foodData.copy()));
         player.experienceLevel = experienceLevel;
         player.setExperienceLevels(experienceLevel);
         player.totalExperience = totalExperience;
@@ -192,16 +179,16 @@ public class SwapSnapshot {
         for (MobEffectInstance effect : effects) {
             player.addEffect(new MobEffectInstance(effect));
         }
-        player.getInventory().selected = selectedSlot;
-        player.teleportTo(level, x, y, z, yRot, xRot);
+        player.getInventory().setSelectedSlot(selectedSlot);
+        player.teleportTo(level, x, y, z, Set.of(), yRot, xRot, true);
 
-        player.getAttributes().load(attributes);
+        player.getAttributes().apply(attributes);
 
         if (!entityData.isEmpty()) {
             player.getEntityData().assignValues(entityData);
         }
 
-        player.readAdditionalSaveData(additionalData.copy());
+        player.readAdditionalSaveData(TagValueInput.create(ProblemReporter.DISCARDING, player.registryAccess(), additionalData.copy()));
 
         applyRiding(player);
         if (isAsleep != null) {
@@ -224,7 +211,6 @@ public class SwapSnapshot {
         player.getStats().markAllDirty();
 
         player.setMainArm(mainArm);
-        player.noCulling = noCulling;
 
         if (chatSession != null) player.setChatSession(chatSession);
 
@@ -239,9 +225,9 @@ public class SwapSnapshot {
     }
 
     private void applyInventory(ServerPlayer player) {
-        copyItemsInto(player.getInventory().items, mainInventory);
-        copyItemsInto(player.getInventory().armor, armorInventory);
-        copyItemsInto(player.getInventory().offhand, offhandInventory);
+        for (int slot = 0; slot < Math.min(player.getInventory().getContainerSize(), inventoryItems.size()); slot++) {
+            player.getInventory().setItem(slot, inventoryItems.get(slot).copy());
+        }
         player.inventoryMenu.broadcastChanges();
     }
 
@@ -268,18 +254,12 @@ public class SwapSnapshot {
         }
     }
 
-    private static List<ItemStack> copyItemsFrom(List<ItemStack> source) {
-        List<ItemStack> copy = new ArrayList<>(source.size());
-        for (ItemStack stack : source) {
-            copy.add(stack.copy());
+    private static List<ItemStack> copyInventory(ServerPlayer player) {
+        List<ItemStack> snapshot = new ArrayList<>();
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            snapshot.add(player.getInventory().getItem(slot).copy());
         }
-        return copy;
-    }
-
-    private static void copyItemsInto(List<ItemStack> target, List<ItemStack> source) {
-        for (int i = 0; i < target.size(); i++) {
-            target.set(i, i < source.size() ? source.get(i).copy() : ItemStack.EMPTY);
-        }
+        return snapshot;
     }
 
     private static class Builder {
@@ -290,19 +270,18 @@ public class SwapSnapshot {
         boolean fallFlying;
         boolean wonGame;
         ServerStatsCounter stats;
-        ListTag attributes;
+        List<AttributeInstance.Packed> attributes;
         HumanoidArm mainArm;
         ServerGamePacketListenerImpl connection;
-        boolean noCulling;
         RemoteChatSession chatSession;
         Abilities abilities;
         ServerLevel level;
         double x, y, z;
         float yRot, xRot;
-        List<ItemStack> mainInventory, armorInventory, offhandInventory, enderChest;
+        List<ItemStack> inventoryItems, enderChest;
         int selectedSlot;
-        float health, saturationLevel, exhaustionLevel;
-        int foodLevel;
+        float health;
+        CompoundTag foodData;
         int experienceLevel;
         float experienceProgress;
         int totalExperience;
