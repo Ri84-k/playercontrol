@@ -1,6 +1,7 @@
 package ml.mypals.controlPlayer.core;
 
 import com.mojang.authlib.GameProfile;
+import ml.mypals.controlPlayer.PlayerControl;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,13 +35,24 @@ public class PlayerSwapManager {
         originalStates.put(uidA, snapA);
         originalStates.put(uidB, snapB);
 
-        snapB.applyTo(playerA, snapB.gameProfile);
-        snapA.applyTo(playerB, snapA.gameProfile);
+        try {
+            snapB.applyTo(playerA, snapB.gameProfile);
+            snapA.applyTo(playerB, snapA.gameProfile);
 
-        playerA.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerA);
-        playerB.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
-
-        return SwapResult.success(Component.empty());
+            playerA.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerA);
+            playerB.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
+            return SwapResult.success(Component.empty());
+        } catch (RuntimeException failure) {
+            PlayerControl.LOGGER.error("Player swap failed for {} and {}; attempting rollback", uidA, uidB, failure);
+            boolean recoveredA = restoreAfterFailure(playerA, snapA);
+            boolean recoveredB = restoreAfterFailure(playerB, snapB);
+            if (recoveredA && recoveredB) {
+                clearSwap(uidA, uidB);
+            } else {
+                PlayerControl.LOGGER.error("Incomplete swap rollback! Pair {} / {} retained for recovery", uidA, uidB);
+            }
+            return SwapResult.fail(Component.translatable("controlplayer.error.swap_failed"));
+        }
     }
 
     public SwapResult release(ServerPlayer initiator, MinecraftServer server) {
@@ -58,30 +70,30 @@ public class PlayerSwapManager {
         SwapSnapshot currentA = SwapSnapshot.capture(initiator);
         SwapSnapshot currentB = (playerB != null) ? SwapSnapshot.capture(playerB) : null;
 
-        activeSwaps.remove(uidA);
-        activeSwaps.remove(uidB);
-        originalStates.remove(uidA);
-        originalStates.remove(uidB);
-
         if (origA == null) {
             return SwapResult.fail(Component.translatable("controlplayer.error.original_missing"));
         }
-        if (currentB != null) {
-            currentB.applyTo(initiator, origA.gameProfile);
-        } else {
-            origA.applyTo(initiator, origA.gameProfile);
+        try {
+            if (currentB != null) {
+                currentB.applyTo(initiator, origA.gameProfile);
+            } else {
+                origA.applyTo(initiator, origA.gameProfile);
+            }
+            if (playerB != null) {
+                GameProfile profileForB = (origB != null) ? origB.gameProfile : playerB.getGameProfile();
+                currentA.applyTo(playerB, profileForB);
+            }
+
+            initiator.level().getServer().getPlayerList().sendPlayerPermissionLevel(initiator);
+            if (playerB != null) playerB.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
+            clearSwap(uidA, uidB);
+            return SwapResult.success(Component.empty());
+        } catch (RuntimeException failure) {
+            PlayerControl.LOGGER.error("Player release failed for {} and {}; attempting rollback", uidA, uidB, failure);
+            restoreAfterFailure(initiator, currentA);
+            if (playerB != null && currentB != null) restoreAfterFailure(playerB, currentB);
+            return SwapResult.fail(Component.translatable("controlplayer.error.release_failed"));
         }
-
-        if (playerB != null) {
-            GameProfile profileForB = (origB != null) ? origB.gameProfile : playerB.getGameProfile();
-            currentA.applyTo(playerB, profileForB);
-        }
-
-
-        initiator.level().getServer().getPlayerList().sendPlayerPermissionLevel(initiator);
-        if (playerB != null) playerB.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
-
-        return SwapResult.success(Component.empty());
     }
 
     public SwapResult forceRelease(UUID targetUid, MinecraftServer server) {
@@ -97,20 +109,36 @@ public class PlayerSwapManager {
         UUID uidB = activeSwaps.get(targetUid);
         SwapSnapshot origB = originalStates.get(uidB);
 
-        activeSwaps.remove(targetUid);
-        activeSwaps.remove(uidB);
-        originalStates.remove(targetUid);
-        originalStates.remove(uidB);
-
         ServerPlayer playerB = server.getPlayerList().getPlayer(uidB);
-        if (playerB != null && origB != null) {
-            origB.applyTo(playerB, origB.gameProfile);
-            playerB.sendSystemMessage(Component.translatable("controlplayer.partner_offline_restored"));
+        try {
+            if (playerB != null && origB != null) {
+                origB.applyTo(playerB, origB.gameProfile);
+                playerB.sendSystemMessage(Component.translatable("controlplayer.partner_offline_restored"));
+                playerB.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
+            }
+            clearSwap(targetUid, uidB);
+            return SwapResult.success(Component.empty());
+        } catch (RuntimeException failure) {
+            PlayerControl.LOGGER.error("Forced player release failed for {}", targetUid, failure);
+            return SwapResult.fail(Component.translatable("controlplayer.error.release_failed"));
         }
+    }
 
-        if (playerB != null) playerB.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
+    private void clearSwap(UUID first, UUID second) {
+        activeSwaps.remove(first);
+        activeSwaps.remove(second);
+        originalStates.remove(first);
+        originalStates.remove(second);
+    }
 
-        return SwapResult.success(Component.empty());
+    private static boolean restoreAfterFailure(ServerPlayer player, SwapSnapshot snapshot) {
+        try {
+            snapshot.applyTo(player, snapshot.gameProfile);
+            return true;
+        } catch (RuntimeException failure) {
+            PlayerControl.LOGGER.error("Failed restoring {} during swap rollback", player.getUUID(), failure);
+            return false;
+        }
     }
 
     public boolean isSwapped(UUID uid) {
