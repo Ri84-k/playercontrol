@@ -58,8 +58,6 @@ class Rcon:
 def main() -> None:
     settings = Path("run/server.properties").read_text(encoding="utf-8").splitlines()
     password = next(line.partition("=")[2] for line in settings if line.startswith("rcon.password="))
-    with socket.create_connection(("127.0.0.1", 25575), timeout=1):
-        pass
     rcon = Rcon(password)
     rcon.command("carpet allowSpawningOfflinePlayers true")
     rcon.command("player TestBotA spawn")
