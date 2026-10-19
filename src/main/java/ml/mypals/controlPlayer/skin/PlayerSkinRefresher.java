@@ -1,5 +1,6 @@
 package ml.mypals.controlPlayer.skin;
 
+import com.google.common.collect.LinkedListMultimap;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import com.mojang.authlib.properties.PropertyMap;
@@ -24,21 +25,21 @@ public class PlayerSkinRefresher {
 
     public static void applyProfileAndRefresh(ServerPlayer player, GameProfile newProfile) {
         GameProfile current = player.getGameProfile();
-        PropertyMap newMap = new PropertyMap();
-        for (var entry : current.getProperties().entries()) {
+        PropertyMap newMap = new PropertyMap(LinkedListMultimap.create());
+        for (var entry : current.properties().entries()) {
             if (!entry.getKey().equals(TEXTURES_KEY)) {
                 newMap.put(entry.getKey(), entry.getValue());
             }
         }
-        for (Property texProp : newProfile.getProperties().get(TEXTURES_KEY)) {
+        for (Property texProp : newProfile.properties().get(TEXTURES_KEY)) {
             newMap.put(TEXTURES_KEY, texProp);
         }
 
-        GameProfile applied = new GameProfile(current.getId(), newProfile.getName());
-        applied.getProperties().putAll(newMap);
+        GameProfile applied = new GameProfile(current.id(), newProfile.name());
+        applied.properties().putAll(newMap);
         ((PlayerAccessor) player).setGameProfile(applied);
 
-        PlayerList playerList = Objects.requireNonNull(player.getServer()).getPlayerList();
+        PlayerList playerList = Objects.requireNonNull(player.level().getServer()).getPlayerList();
         playerList.broadcastAll(new ClientboundBundlePacket(List.of(
                 new ClientboundPlayerInfoRemovePacket(List.of(player.getUUID())),
                 ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(Collections.singleton(player))
@@ -46,7 +47,7 @@ public class PlayerSkinRefresher {
 
         refreshEntityTracking(player);
         if (!player.isDeadOrDying()) {
-            ServerLevel level = player.serverLevel();
+            ServerLevel level = player.level();
 
             player.connection.send(new ClientboundBundlePacket(List.of(
                     new ClientboundRespawnPacket(
@@ -90,7 +91,7 @@ public class PlayerSkinRefresher {
     }
 
     private static void refreshEntityTracking(ServerPlayer player) {
-        ChunkMap chunkMap = player.serverLevel().getChunkSource().chunkMap;
+        ChunkMap chunkMap = player.level().getChunkSource().chunkMap;
         TrackedEntityAccessor tracked = (TrackedEntityAccessor) chunkMap.entityMap.get(player.getId());
         if (tracked == null) return;
 
