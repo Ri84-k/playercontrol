@@ -4,6 +4,7 @@ import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import ml.mypals.controlPlayer.core.PlayerSwapManager;
+import ml.mypals.controlPlayer.net.FakePlayerMenuPackets;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -40,6 +41,8 @@ public class PlayerControlCommand {
                 .then(Commands.literal("list")
                         .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                         .executes(this::listSwaps))
+                .then(Commands.literal("menu")
+                        .executes(this::openMenu))
                 .then(Commands.literal("status")
                         .executes(this::showStatus))
         );
@@ -126,6 +129,16 @@ public class PlayerControlCommand {
             ctx.getSource().sendSuccess(() ->
                     Component.translatable("controlplayer.list.entry", nameA, nameB).withStyle(ChatFormatting.AQUA), false);
         }
+        return 1;
+    }
+
+    private int openMenu(CommandContext<CommandSourceStack> ctx) {
+        ServerPlayer player = ctx.getSource().getPlayer();
+        if (player == null) {
+            ctx.getSource().sendFailure(Component.translatable("controlplayer.error.player_only"));
+            return 0;
+        }
+        FakePlayerMenuPackets.sendTo(player);
         return 1;
     }
 
