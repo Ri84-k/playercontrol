@@ -17,6 +17,9 @@
   "entrypoints": {
     "main": [
       "ml.mypals.controlPlayer.PlayerControl"
+    ],
+    "client": [
+      "ml.mypals.controlPlayer.client.PlayerControlClient"
     ]
   },
   "mixins": [
