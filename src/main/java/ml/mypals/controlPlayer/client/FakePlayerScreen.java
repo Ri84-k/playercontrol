@@ -142,11 +142,10 @@ public final class FakePlayerScreen extends Screen {
         addRenderableWidget(Button.builder(Component.translatable("gui.done"),
                 b -> onClose()).bounds(center - 52, footer + 26, 104, 20).build());
 
-        // Refresh on return from the prompt/actions screens and when initially opened.
-        requestList();
+        if (!loaded) requestList();
     }
 
-    private void requestList() {
+    public void requestList() {
         if (ClientPlayNetworking.canSend(FakePlayerMenuPackets.Request.TYPE)) {
             ClientPlayNetworking.send(FakePlayerMenuPackets.Request.INSTANCE);
         }
@@ -156,6 +155,7 @@ public final class FakePlayerScreen extends Screen {
         if (minecraft != null && minecraft.player != null && minecraft.player.connection != null) {
             minecraft.player.connection.sendCommand(command);
             minecraft.gui.setScreen(this);
+            requestList();
         }
     }
 
