@@ -20,11 +20,11 @@ public abstract class FakePlayerMixin extends ServerPlayer {
     }
 
     @Inject(
-            method = "kill()V",
+            method = "kill(Lnet/minecraft/network/chat/Component;)V",
             at = @At("HEAD")
     )  public void kill(CallbackInfo ci) {
         if(PlayerControl.getSwapManager().isSwapped(this.getUUID())){
-            PlayerControl.getSwapManager().release(this,this.server);
+            PlayerControl.getSwapManager().release(this,this.level().getServer());
         }
     }
 }
