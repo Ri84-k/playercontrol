@@ -16,5 +16,16 @@
   "controlplayer.status.none": "你当前没有正在进行的交换！",
   "controlplayer.status.partner": "你正在与 %s 交换身份！",
   "controlplayer.error.swap_failed": "交换失败。请检查服务器日志；已尝试恢复原始玩家状态。",
-  "controlplayer.error.release_failed": "解除交换失败。请检查服务器日志；交换记录已保留以便恢复。"
+  "controlplayer.error.release_failed": "解除交换失败。请检查服务器日志；交换记录已保留以便恢复。",
+  "key.category.fackplayercontrol.controls": "玩家控制",
+  "key.fackplayercontrol.open_menu": "打开假人管理器",
+  "controlplayer.menu.title": "假人管理器",
+  "controlplayer.menu.swap": "交换",
+  "controlplayer.menu.release": "解除交换",
+  "controlplayer.menu.refresh": "刷新",
+  "controlplayer.menu.loading": "正在加载假人...",
+  "controlplayer.menu.empty": "当前没有在线 Carpet 假人",
+  "controlplayer.menu.count": "当前在线 Carpet 假人数：%s",
+  "controlplayer.menu.swapped": "当前处于交换状态，请先解除",
+  "controlplayer.menu.unavailable": "此服务器不支持 PlayerControl 管理器。"
 }
