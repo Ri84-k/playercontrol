@@ -16,5 +16,16 @@
   "controlplayer.status.none": "Not swapping with anyone!",
   "controlplayer.status.partner": "You are swapping with %s!",
   "controlplayer.error.swap_failed": "Swap failed. Check the server log; original player states were restored where possible.",
-  "controlplayer.error.release_failed": "Release failed. Check the server log; the swap is still registered for recovery."
+  "controlplayer.error.release_failed": "Release failed. Check the server log; the swap is still registered for recovery.",
+  "key.category.fackplayercontrol.controls": "PlayerControl",
+  "key.fackplayercontrol.open_menu": "Open Fake Player Manager",
+  "controlplayer.menu.title": "Fake Player Manager",
+  "controlplayer.menu.swap": "Swap",
+  "controlplayer.menu.release": "Release",
+  "controlplayer.menu.refresh": "Refresh",
+  "controlplayer.menu.loading": "Loading fake players...",
+  "controlplayer.menu.empty": "No Carpet fake players online",
+  "controlplayer.menu.count": "%s online Carpet fake player(s)",
+  "controlplayer.menu.swapped": "Currently swapping - release to switch again",
+  "controlplayer.menu.unavailable": "This server does not support the PlayerControl menu."
 }
