@@ -79,7 +79,10 @@ def main() -> None:
     before = rcon.command("execute as TestBotA run controlPlayer status")
     swapped = rcon.command("execute as TestBotA run controlPlayer swap TestBotB")
     after = rcon.command("execute as TestBotA run controlPlayer status")
-    swapped_items = rcon.command("clear TestBotA minecraft:emerald 0")
+    # PlayerControl exchanges the two profiles' names. During the swap,
+    # the player visible as TestBotB holds TestBotB's original inventory.
+    swapped_items = rcon.command("clear TestBotB minecraft:emerald 0")
+    swapped_other_items = rcon.command("clear TestBotA minecraft:diamond 0")
     restored = rcon.command("execute as TestBotA run controlPlayer release")
     final = rcon.command("execute as TestBotA run controlPlayer status")
     restored_items = rcon.command("clear TestBotA minecraft:diamond 0")
@@ -97,7 +100,8 @@ def main() -> None:
     if "Swapped!" not in swapped or "TestBotB" not in after:
         raise RuntimeError("Swap was not confirmed by the command/status output")
     for description, result, amount in (("before swap", initial_items, "3"),
-                                        ("during swap", swapped_items, "5"),
+                                        ("during swap - renamed B", swapped_items, "5"),
+                                        ("during swap - renamed A", swapped_other_items, "3"),
                                         ("after release", restored_items, "3")):
         if amount not in result or "found" not in result.lower():
             raise RuntimeError(f"Inventory item check failed {description}: {result!r}")
