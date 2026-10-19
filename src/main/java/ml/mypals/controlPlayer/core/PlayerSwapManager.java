@@ -37,8 +37,8 @@ public class PlayerSwapManager {
         snapB.applyTo(playerA, snapB.gameProfile);
         snapA.applyTo(playerB, snapA.gameProfile);
 
-        playerA.getServer().getPlayerList().sendPlayerPermissionLevel(playerA);
-        playerB.getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
+        playerA.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerA);
+        playerB.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
 
         return SwapResult.success(Component.empty());
     }
@@ -78,8 +78,8 @@ public class PlayerSwapManager {
         }
 
 
-        initiator.getServer().getPlayerList().sendPlayerPermissionLevel(initiator);
-        playerB.getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
+        initiator.level().getServer().getPlayerList().sendPlayerPermissionLevel(initiator);
+        if (playerB != null) playerB.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
 
         return SwapResult.success(Component.empty());
     }
@@ -108,7 +108,7 @@ public class PlayerSwapManager {
             playerB.sendSystemMessage(Component.translatable("controlplayer.partner_offline_restored"));
         }
 
-        playerB.getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
+        if (playerB != null) playerB.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
 
         return SwapResult.success(Component.empty());
     }
