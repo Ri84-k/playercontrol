@@ -9,7 +9,6 @@ import net.minecraft.util.ProblemReporter;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.TagValueOutput;
 import java.util.Set;
-import net.minecraft.network.chat.RemoteChatSession;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -39,7 +38,6 @@ public class SwapSnapshot {
     public final ServerGamePacketListenerImpl connection;
     public final List<UUID> passengers;
     public final UUID vehicle;
-    public final RemoteChatSession chatSession;
     public final List<AttributeInstance.Packed> attributes;
     public final Abilities abilities;
     public final ServerLevel level;
@@ -83,7 +81,6 @@ public class SwapSnapshot {
         this.stats = b.stats;
         this.mainArm = b.mainArm;
         this.connection = b.connection;
-        this.chatSession = b.chatSession;
         this.abilities = b.abilities;
         this.isAsleep = b.isAsleep;
         this.vehicle = b.vehicle;
@@ -100,7 +97,6 @@ public class SwapSnapshot {
         b.stats = player.getStats();
         b.mainArm = player.getMainArm();
         b.connection = player.connection;
-        b.chatSession = player.getChatSession();
 
         Abilities src = player.getAbilities();
         Abilities abCopy = new Abilities();
@@ -223,7 +219,8 @@ public class SwapSnapshot {
         stage = "player cosmetic and chat session restore";
         player.setMainArm(mainArm);
 
-        if (chatSession != null) player.setChatSession(chatSession);
+        // Authenticated chat keys are signed for a specific UUID. Never copy the
+        // chat session to a different player during an identity/state swap.
 
         stage = "player abilities restore";
         Abilities dst = player.getAbilities();
@@ -290,7 +287,6 @@ public class SwapSnapshot {
         List<AttributeInstance.Packed> attributes;
         HumanoidArm mainArm;
         ServerGamePacketListenerImpl connection;
-        RemoteChatSession chatSession;
         Abilities abilities;
         ServerLevel level;
         double x, y, z;
