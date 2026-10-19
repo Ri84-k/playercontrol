@@ -1,6 +1,6 @@
 package ml.mypals.controlPlayer.skin;
 
-import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.ImmutableMultimap;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import com.mojang.authlib.properties.PropertyMap;
@@ -25,17 +25,20 @@ public class PlayerSkinRefresher {
 
     public static void applyProfileAndRefresh(ServerPlayer player, GameProfile newProfile) {
         GameProfile current = player.getGameProfile();
-        PropertyMap newMap = new PropertyMap(LinkedListMultimap.create());
+        // Authlib 26.2 exposes PropertyMap as immutable. Build all entries first,
+        // then construct the immutable PropertyMap in one step.
+        ImmutableMultimap.Builder<String, Property> properties = ImmutableMultimap.builder();
         for (var entry : current.properties().entries()) {
             if (!entry.getKey().equals(TEXTURES_KEY)) {
-                newMap.put(entry.getKey(), entry.getValue());
+                properties.put(entry.getKey(), entry.getValue());
             }
         }
         for (Property texProp : newProfile.properties().get(TEXTURES_KEY)) {
-            newMap.put(TEXTURES_KEY, texProp);
+            properties.put(TEXTURES_KEY, texProp);
         }
 
-        GameProfile applied = new GameProfile(current.id(), newProfile.name(), newMap);
+        GameProfile applied = new GameProfile(current.id(), newProfile.name(),
+                new PropertyMap(properties.build()));
         ((PlayerAccessor) player).setGameProfile(applied);
 
         PlayerList playerList = Objects.requireNonNull(player.level().getServer()).getPlayerList();
