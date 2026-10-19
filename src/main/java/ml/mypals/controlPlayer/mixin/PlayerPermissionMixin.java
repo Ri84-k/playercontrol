@@ -31,7 +31,7 @@ public abstract class PlayerPermissionMixin {
 
         UUID uuid = gameProfile.getId();
 
-        if(!this.getGameRules().getRule(ModGameRules.PERMISSION_SWAP).get()){
+        if(!this.getGameRules().get(ModGameRules.PERMISSION_SWAP)){
             if(PlayerControl.getSwapManager().isSwapped(uuid)){
                 PlayerControl.getSwapManager().getSwapPartner(uuid).ifPresent(p -> {
                     ServerPlayer partner = this.getPlayerList().getPlayer(p);
