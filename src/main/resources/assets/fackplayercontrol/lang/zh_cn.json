@@ -5,19 +5,16 @@
   "controlplayer.error.already_swapped": "%s 已处于交换状态，请先解除。",
   "controlplayer.error.not_swapped": "当前没有正在进行的交换。",
   "controlplayer.error.original_missing": "找不到发起者的原始状态，无法还原。",
-
   "controlplayer.swap.success": "你已与 %s 交换身份，你现在是 %s！",
   "controlplayer.swap.done": "交换成功！",
-
   "controlplayer.release.success": "交换已解除，欢迎回来！",
   "controlplayer.release.force_success": "已强制解除 %s 的交换状态！",
-
   "controlplayer.partner_offline_restored": "交换对象已离线，你的原始身份已自动还原。",
-
   "controlplayer.list.empty": "当前没有进行中的交换。",
   "controlplayer.list.header": "--- 当前交换列表 ---",
   "controlplayer.list.entry": "  |- %s 与 %s",
-
   "controlplayer.status.none": "你当前没有正在进行的交换！",
-  "controlplayer.status.partner": "你正在与 %s 交换身份！"
+  "controlplayer.status.partner": "你正在与 %s 交换身份！",
+  "controlplayer.error.swap_failed": "交换失败。请检查服务器日志；已尝试恢复原始玩家状态。",
+  "controlplayer.error.release_failed": "解除交换失败。请检查服务器日志；交换记录已保留以便恢复。"
 }
