@@ -165,20 +165,27 @@ public class SwapSnapshot {
     }
 
     public void applyTo(ServerPlayer player, GameProfile profileToApply) {
+        String stage = "profile refresh";
+        try {
         PlayerSkinRefresher.applyProfileAndRefresh(player, profileToApply);
+        stage = "inventory restore";
         applyInventory(player);
+        stage = "ender chest restore";
         applyEnderChest(player);
+        stage = "health, food and experience restore";
         player.setHealth(health);
         FoodData food = player.getFoodData();
         food.readAdditionalSaveData(TagValueInput.create(ProblemReporter.DISCARDING, player.registryAccess(), foodData.copy()));
         player.experienceLevel = experienceLevel;
         player.setExperienceLevels(experienceLevel);
         player.totalExperience = totalExperience;
+        stage = "game mode and potion effects restore";
         player.setGameMode(gameMode);
         player.removeAllEffects();
         for (MobEffectInstance effect : effects) {
             player.addEffect(new MobEffectInstance(effect));
         }
+        stage = "position and attribute restore";
         player.getInventory().setSelectedSlot(selectedSlot);
         player.teleportTo(level, x, y, z, Set.of(), yRot, xRot, true);
 
@@ -188,8 +195,10 @@ public class SwapSnapshot {
             player.getEntityData().assignValues(entityData);
         }
 
+        stage = "additional player NBT restore";
         player.readAdditionalSaveData(TagValueInput.create(ProblemReporter.DISCARDING, player.registryAccess(), additionalData.copy()));
 
+        stage = "vehicle and sleep restore";
         applyRiding(player);
         if (isAsleep != null) {
             player.startSleepInBed(isAsleep);
@@ -204,16 +213,19 @@ public class SwapSnapshot {
 
         player.wonGame = wonGame;
 
+        stage = "statistics restore";
         for (Map.Entry<Stat<?>, Integer> entry : stats.stats.object2IntEntrySet()) {
             player.getStats().setValue(player, entry.getKey(), entry.getValue());
         }
         player.getStats().sendStats(player);
         player.getStats().markAllDirty();
 
+        stage = "player cosmetic and chat session restore";
         player.setMainArm(mainArm);
 
         if (chatSession != null) player.setChatSession(chatSession);
 
+        stage = "player abilities restore";
         Abilities dst = player.getAbilities();
         dst.invulnerable = abilities.invulnerable;
         dst.flying = abilities.flying;
@@ -222,6 +234,11 @@ public class SwapSnapshot {
         dst.setWalkingSpeed(abilities.getWalkingSpeed());
         dst.setFlyingSpeed(abilities.getFlyingSpeed());
         player.onUpdateAbilities();
+        } catch (RuntimeException exception) {
+            ml.mypals.controlPlayer.PlayerControl.LOGGER.error(
+                    "Failed restoring player snapshot at stage '{}' for player {}", stage, player.getUUID(), exception);
+            throw exception;
+        }
     }
 
     private void applyInventory(ServerPlayer player) {
