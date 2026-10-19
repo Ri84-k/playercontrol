@@ -23,20 +23,25 @@ jobs:
         run: chmod +x ./gradlew
       - name: build
         run: ./gradlew build --stacktrace
-      - name: server startup smoke test
+      - name: server startup and Carpet fake-player integration test
         shell: bash
         timeout-minutes: 5
         run: |
           set -euo pipefail
           mkdir -p run
           echo 'eula=true' > run/eula.txt
+          printf '%s\n' 'online-mode=false' 'enable-rcon=true' "rcon.password=$(openssl rand -hex 24)" 'rcon.port=25575' > run/server.properties
           ./gradlew runServer --console=plain > server-startup.log 2>&1 &
           gradle_pid=$!
           trap 'kill "$gradle_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 150); do
             if grep -Fq 'Done (' server-startup.log; then
               echo "Minecraft server reported successful startup"
-              tail -n 70 server-startup.log
+              if ! python3 scripts/rcon_smoke.py; then
+                tail -n 180 server-startup.log
+                exit 1
+              fi
+              tail -n 80 server-startup.log
               exit 0
             fi
             if ! kill -0 "$gradle_pid" 2>/dev/null; then
