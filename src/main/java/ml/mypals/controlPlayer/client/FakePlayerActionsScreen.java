@@ -52,7 +52,7 @@ public final class FakePlayerActionsScreen extends Screen {
     private void perform(String action) {
         // Names come from the server's list; validate again before issuing a command.
         if (!name.matches("[A-Za-z0-9_]{1,16}")) return;
-        parent.runAndReturn("player " + name + " " + action);
+        parent.sendAction(action, name, false);
     }
 
     @Override
@@ -88,7 +88,7 @@ public final class FakePlayerActionsScreen extends Screen {
             addRenderableWidget(Button.builder(Component.translatable("controlplayer.menu.actions.confirm_kill"),
                     button -> {
                         if (name.matches("[A-Za-z0-9_]{1,16}")) {
-                            parent.parent.runAndReturn("player " + name + " kill");
+                            parent.parent.sendAction("kill", name, false);
                         }
                     }).bounds(cx - 120, cy + 10, 116, 20).build());
             addRenderableWidget(Button.builder(Component.translatable("gui.cancel"),
