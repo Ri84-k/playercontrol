@@ -2,9 +2,10 @@ package ml.mypals.controlPlayer.net;
 
 import carpet.patches.EntityPlayerMPFake;
 import ml.mypals.controlPlayer.PlayerControl;
+import ml.mypals.controlPlayer.core.PlayerControlAccess;
+import net.minecraft.server.permissions.LevelBasedPermissionSet;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.commands.Commands;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -67,11 +68,89 @@ public final class FakePlayerMenuPackets {
         public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
+
+    /**
+     * Only a small whitelist of existing PlayerControl/Carpet commands is accepted;
+     * clients can never send arbitrary commands or escalate their own permissions.
+     */
+    public record ActionRequest(String action, String name) implements CustomPacketPayload {
+        public static final Type<ActionRequest> TYPE =
+                new Type<>(Identifier.fromNamespaceAndPath(PlayerControl.MOD_ID, "fake_player_menu_action"));
+        public static final StreamCodec<RegistryFriendlyByteBuf, ActionRequest> CODEC =
+                CustomPacketPayload.codec(ActionRequest::write, ActionRequest::read);
+
+        private void write(RegistryFriendlyByteBuf buf) {
+            buf.writeUtf(action, 32);
+            buf.writeUtf(name, 16);
+        }
+
+        private static ActionRequest read(RegistryFriendlyByteBuf buf) {
+            return new ActionRequest(buf.readUtf(32), buf.readUtf(16));
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    }
+
+    private static void handleAction(ServerPlayer player, ActionRequest request) {
+        String action = request.action();
+        String name = request.name();
+
+        // Even unprivileged players may check their status and release themselves.
+        boolean needsPrivileges = !action.equals("status") && !action.equals("release");
+        if (needsPrivileges && !PlayerControlAccess.canManage(player)) {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
+                    "controlplayer.menu.permission_denied"));
+            return;
+        }
+
+        final String command;
+        if (action.equals("status")) {
+            command = "controlPlayer status";
+        } else if (action.equals("release")) {
+            command = "controlPlayer release";
+        } else {
+            // Never build commands from unvalidated names or arbitrary action suffixes.
+            if (!name.matches("[A-Za-z0-9_]{1,16}")) return;
+
+            if (action.equals("spawn")) {
+                command = "player " + name + " spawn";
+            } else {
+                ServerPlayer target = player.level().getServer().getPlayerList().getPlayerByName(name);
+                if (!(target instanceof EntityPlayerMPFake)) {
+                    player.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
+                            "controlplayer.menu.target_not_fake"));
+                    return;
+                }
+                command = switch (action) {
+                    case "swap" -> "controlPlayer swap " + name;
+                    case "stop", "attack once", "attack continuous", "use once",
+                         "use continuous", "jump once", "move forward", "sneak", "kill" ->
+                            "player " + name + " " + action;
+                    default -> null;
+                };
+            }
+        }
+
+        if (command == null) return;
+
+        // Elevation is scoped to this one allowlisted command execution, and ONLY
+        // for the actual owner of an integrated singleplayer world.
+        var source = player.createCommandSourceStack();
+        if (PlayerControlAccess.isSingleplayerOwner(player)) {
+            source = source.withMaximumPermission(LevelBasedPermissionSet.OWNER);
+        }
+        player.level().getServer().getCommands().performPrefixedCommand(source, command);
+    }
+
     public static void register() {
         PayloadTypeRegistry.serverboundPlay().register(Request.TYPE, Request.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(ActionRequest.TYPE, ActionRequest.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(ListResponse.TYPE, ListResponse.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(Request.TYPE, (payload, context) ->
                 context.server().execute(() -> sendTo(context.player())));
+        ServerPlayNetworking.registerGlobalReceiver(ActionRequest.TYPE, (payload, context) ->
+                context.server().execute(() -> handleAction(context.player(), payload)));
     }
 
     public static void sendTo(ServerPlayer player) {
@@ -84,7 +163,7 @@ public final class FakePlayerMenuPackets {
                 .sorted(Comparator.naturalOrder())
                 .limit(256)
                 .toList();
-        boolean canSwap = Commands.LEVEL_GAMEMASTERS.check(player.permissions());
+        boolean canSwap = PlayerControlAccess.canManage(player);
         boolean isSwapped = PlayerControl.getSwapManager().isSwapped(player.getUUID());
         ServerPlayNetworking.send(player, new ListResponse(onlineFakes, isSwapped, canSwap));
     }
