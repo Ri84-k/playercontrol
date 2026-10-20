@@ -50,5 +50,7 @@
   "controlplayer.menu.actions.sneak": "Sneak",
   "controlplayer.menu.actions.kill": "Remove Player",
   "controlplayer.menu.actions.confirm_kill": "Confirm Remove",
-  "controlplayer.menu.actions.kill_warning": "Remove %s? This kills and disconnects the bot."
+  "controlplayer.menu.actions.kill_warning": "Remove %s? This kills and disconnects the bot.",
+  "controlplayer.menu.permission_denied": "Only the singleplayer world owner or a server operator may manage fake players.",
+  "controlplayer.menu.target_not_fake": "The selected player is no longer an online Carpet fake player."
 }
