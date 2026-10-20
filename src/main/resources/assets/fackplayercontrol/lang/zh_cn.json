@@ -50,5 +50,7 @@
   "controlplayer.menu.actions.sneak": "潜行",
   "controlplayer.menu.actions.kill": "移除假人",
   "controlplayer.menu.actions.confirm_kill": "确认移除",
-  "controlplayer.menu.actions.kill_warning": "确定移除 %s 吗？这将使假人死亡并断开连接。"
+  "controlplayer.menu.actions.kill_warning": "确定移除 %s 吗？这将使假人死亡并断开连接。",
+  "controlplayer.menu.permission_denied": "只有单人世界所有者或服务器管理员可以管理假人。",
+  "controlplayer.menu.target_not_fake": "所选玩家已不再是在线的 Carpet 假人。"
 }
