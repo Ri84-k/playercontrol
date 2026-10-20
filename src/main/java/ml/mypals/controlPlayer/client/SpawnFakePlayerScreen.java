@@ -54,9 +54,9 @@ public final class SpawnFakePlayerScreen extends Screen {
                 || minecraft.player.connection == null) {
             return;
         }
-        minecraft.player.connection.sendCommand("player " + name + " spawn");
+        parent.sendAction("spawn", name, false);
         parent.waitForSpawn(name);
-        minecraft.gui.setScreen(parent);
+        parent.requestList();
     }
 
     @Override
