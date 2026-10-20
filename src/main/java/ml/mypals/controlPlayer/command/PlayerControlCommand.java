@@ -4,6 +4,7 @@ import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import ml.mypals.controlPlayer.core.PlayerSwapManager;
+import ml.mypals.controlPlayer.core.PlayerControlAccess;
 import ml.mypals.controlPlayer.net.FakePlayerMenuPackets;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -30,16 +31,16 @@ public class PlayerControlCommand {
     public void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("controlPlayer")
                 .then(Commands.literal("swap")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(PlayerControlAccess::canManage)
                         .then(Commands.argument("player", EntityArgument.player())
                                 .executes(this::swapPlayers)))
                 .then(Commands.literal("release")
                         .executes(this::releaseSelf)
                         .then(Commands.argument("player", EntityArgument.player())
-                                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                                .requires(PlayerControlAccess::canManage)
                                 .executes(this::releaseTarget)))
                 .then(Commands.literal("list")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(PlayerControlAccess::canManage)
                         .executes(this::listSwaps))
                 .then(Commands.literal("menu")
                         .executes(this::openMenu))
