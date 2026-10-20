@@ -88,7 +88,7 @@ public final class FakePlayerScreen extends Screen {
             addRenderableWidget(playerLabel);
 
             Button swapButton = Button.builder(Component.translatable("controlplayer.menu.swap"),
-                    b -> runAndClose("controlPlayer swap " + name))
+                    b -> sendAction("swap", name, true))
                     .bounds(center + 13, y, 70, 20).build();
             swapButton.active = canSwap && !swapped
                     && minecraft != null && minecraft.player != null
@@ -104,7 +104,7 @@ public final class FakePlayerScreen extends Screen {
 
         int footer = rowTop + ROWS_PER_PAGE * 22 + 8;
         addRenderableWidget(Button.builder(Component.translatable("controlplayer.menu.status"),
-                b -> runAndClose("controlPlayer status"))
+                b -> sendAction("status", "", true))
                 .bounds(center - 168, footer, 79, 20).build());
 
         Button spawn = Button.builder(Component.translatable("controlplayer.menu.spawn"),
@@ -114,7 +114,7 @@ public final class FakePlayerScreen extends Screen {
         addRenderableWidget(spawn);
 
         Button release = Button.builder(Component.translatable("controlplayer.menu.release"),
-                b -> runAndClose("controlPlayer release"))
+                b -> sendAction("release", "", true))
                 .bounds(center - 2, footer, 79, 20).build();
         release.active = swapped;
         addRenderableWidget(release);
@@ -151,18 +151,21 @@ public final class FakePlayerScreen extends Screen {
         }
     }
 
-    public void runAndReturn(String command) {
-        if (minecraft != null && minecraft.player != null && minecraft.player.connection != null) {
-            minecraft.player.connection.sendCommand(command);
+    /**
+     * All menu operations go through a server-validated, allowlisted payload.
+     * Only the integrated singleplayer world owner can manage bots without OP.
+     */
+    public void sendAction(String action, String name, boolean close) {
+        if (minecraft == null || minecraft.player == null
+                || !ClientPlayNetworking.canSend(FakePlayerMenuPackets.ActionRequest.TYPE)) {
+            return;
+        }
+        ClientPlayNetworking.send(new FakePlayerMenuPackets.ActionRequest(action, name));
+        if (close) {
+            minecraft.gui.setScreen(null);
+        } else {
             minecraft.gui.setScreen(this);
             requestList();
-        }
-    }
-
-    private void runAndClose(String command) {
-        if (minecraft != null && minecraft.player != null && minecraft.player.connection != null) {
-            minecraft.player.connection.sendCommand(command);
-            minecraft.gui.setScreen(null);
         }
     }
 
