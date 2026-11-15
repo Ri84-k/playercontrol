@@ -36,8 +36,14 @@ public class PlayerSwapManager {
         originalStates.put(uidB, snapB);
 
         try {
-            snapB.applyTo(playerA, snapB.gameProfile);
-            snapA.applyTo(playerB, snapA.gameProfile);
+            log("swap before A", snapA, playerA);
+            log("swap before B", snapB, playerB);
+            boolean changedA = snapB.applyState(playerA, snapB.gameProfile);
+            boolean changedB = snapA.applyState(playerB, snapA.gameProfile);
+            snapB.finishRestore(playerA, changedA);
+            snapA.finishRestore(playerB, changedB);
+            log("swap after A", SwapSnapshot.capture(playerA), playerA);
+            log("swap after B", SwapSnapshot.capture(playerB), playerB);
 
             playerA.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerA);
             playerB.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
@@ -74,15 +80,20 @@ public class PlayerSwapManager {
             return SwapResult.fail(Component.translatable("controlplayer.error.original_missing"));
         }
         try {
-            if (currentB != null) {
-                currentB.applyTo(initiator, origA.gameProfile);
+            log("release before A", currentA, initiator);
+            if (currentB != null && playerB != null) {
+                log("release before B", currentB, playerB);
+                GameProfile profileForB = (origB != null) ? origB.gameProfile : playerB.getGameProfile();
+                boolean changedA = currentB.applyState(initiator, origA.gameProfile);
+                boolean changedB = currentA.applyState(playerB, profileForB);
+                currentB.finishRestore(initiator, changedA);
+                currentA.finishRestore(playerB, changedB);
+                log("release after B", SwapSnapshot.capture(playerB), playerB);
             } else {
+                PlayerControl.LOGGER.warn("Release partner {} is offline; restoring original state for {}", uidB, uidA);
                 origA.applyTo(initiator, origA.gameProfile);
             }
-            if (playerB != null) {
-                GameProfile profileForB = (origB != null) ? origB.gameProfile : playerB.getGameProfile();
-                currentA.applyTo(playerB, profileForB);
-            }
+            log("release after A", SwapSnapshot.capture(initiator), initiator);
 
             initiator.level().getServer().getPlayerList().sendPlayerPermissionLevel(initiator);
             if (playerB != null) playerB.level().getServer().getPlayerList().sendPlayerPermissionLevel(playerB);
@@ -122,6 +133,10 @@ public class PlayerSwapManager {
             PlayerControl.LOGGER.error("Forced player release failed for {}", targetUid, failure);
             return SwapResult.fail(Component.translatable("controlplayer.error.release_failed"));
         }
+    }
+
+    private static void log(String stage, SwapSnapshot snapshot, ServerPlayer player) {
+        PlayerControl.LOGGER.info("[swap-sync] {} entity={} {}", stage, player.getUUID(), snapshot.describe());
     }
 
     private void clearSwap(UUID first, UUID second) {
