@@ -96,8 +96,8 @@ def main() -> None:
     # Use immutable UUIDs when referring to actual entities across a profile swap.
     uid_a = entity_uuid(rcon, "TestBotA")
     uid_b = entity_uuid(rcon, "TestBotB")
-    rcon.command(f"gamemode creative {uid_a}")
-    rcon.command(f"gamemode creative {uid_b}")
+    rcon.command(f"execute as {uid_a} run gamemode creative @s")
+    rcon.command(f"execute as {uid_b} run gamemode creative @s")
     rcon.command(f"tp {uid_a} 0 200 0")
     rcon.command(f"tp {uid_b} 10 200 0")
     # Keep the fixtures on separate platforms so gravity cannot affect position assertions.
@@ -117,19 +117,23 @@ def main() -> None:
     # The resulting state must belong to B, not B's old spawn snapshot.
     rcon.command(f"tp {uid_a} 20 200 0")
     rcon.command(f"item replace entity {uid_a} hotbar.0 with minecraft:emerald 7")
-    rcon.command(f"experience set {uid_a} 12 levels")
-    rcon.command(f"experience set {uid_a} 5 points")
+    rcon.command(f"execute as {uid_a} run experience set @s 12 levels")
+    rcon.command(f"execute as {uid_a} run experience set @s 5 points")
+    initial_levels = rcon.command(f"execute as {uid_a} run experience query @s levels")
+    initial_points = rcon.command(f"execute as {uid_a} run experience query @s points")
+    if not re.search(r"\b12\b", initial_levels) or not re.search(r"\b5\b", initial_points):
+        raise RuntimeError(f"Could not initialize XP fixture: {initial_levels!r} / {initial_points!r}")
     changed_position = position(rcon, uid_a)
     restored = rcon.command(f"execute as {uid_a} run controlPlayer release")
     final = rcon.command(f"execute as {uid_a} run controlPlayer status")
-    restored_items = rcon.command(f"clear {uid_a} minecraft:diamond 0")
-    latest_items = rcon.command(f"clear {uid_b} minecraft:emerald 0")
+    restored_items = rcon.command(f"execute as {uid_a} run clear @s minecraft:diamond 0")
+    latest_items = rcon.command(f"execute as {uid_b} run clear @s minecraft:emerald 0")
     final_position = position(rcon, uid_b)
-    final_levels = rcon.command(f"experience query {uid_b} levels")
-    final_points = rcon.command(f"experience query {uid_b} points")
+    final_levels = rcon.command(f"execute as {uid_b} run experience query @s levels")
+    final_points = rcon.command(f"execute as {uid_b} run experience query @s points")
     if any(abs(a - b) > 0.1 for a, b in zip(changed_position, final_position)):
         raise RuntimeError(f"Fake player position reset: {changed_position} -> {final_position}")
-    if "12" not in final_levels or not re.search(r"\b5\b", final_points):
+    if not re.search(r"\b12\b", final_levels) or not re.search(r"\b5\b", final_points):
         raise RuntimeError(f"Latest XP did not transfer: {final_levels!r} / {final_points!r}")
 
     bad = ("unknown or incomplete command", "an unexpected error", "could not execute")
@@ -149,7 +153,7 @@ def main() -> None:
                                         ("during swap - renamed A", swapped_other_items, "3"),
                                         ("after release", restored_items, "3"),
                                         ("latest fake inventory", latest_items, "7")):
-        if amount not in result or "found" not in result.lower():
+        if not re.search(rf"\b{amount}\b", result) or "found" not in result.lower():
             raise RuntimeError(f"Inventory item check failed {description}: {result!r}")
 
     # Validate the Carpet commands exposed by the new Spawn Player / Actions UI.
