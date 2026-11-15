@@ -13,7 +13,9 @@ import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import net.minecraft.stats.ServerStatsCounter;
+import net.minecraft.network.protocol.game.ClientboundSetExperiencePacket;
+import java.util.HashMap;
+import java.util.HashSet;
 import net.minecraft.stats.Stat;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
@@ -33,7 +35,7 @@ public class SwapSnapshot {
     public final GameProfile gameProfile;
     public final boolean fallFlying;
     public final boolean wonGame;
-    public final ServerStatsCounter stats;
+    public final Map<Stat<?>, Integer> stats;
     public final HumanoidArm mainArm;
     public final ServerGamePacketListenerImpl connection;
     public final List<UUID> passengers;
@@ -94,7 +96,7 @@ public class SwapSnapshot {
 
         b.fallFlying = player.isFallFlying();
         b.wonGame = player.wonGame;
-        b.stats = player.getStats();
+        b.stats = new HashMap<>(player.getStats().stats);
         b.mainArm = player.getMainArm();
         b.connection = player.connection;
 
@@ -104,6 +106,7 @@ public class SwapSnapshot {
         abCopy.flying = src.flying;
         abCopy.mayfly = src.mayfly;
         abCopy.instabuild = src.instabuild;
+        abCopy.mayBuild = src.mayBuild;
         abCopy.setWalkingSpeed(src.getWalkingSpeed());
         abCopy.setFlyingSpeed(src.getFlyingSpeed());
         b.abilities = abCopy;
@@ -160,82 +163,118 @@ public class SwapSnapshot {
         return new SwapSnapshot(b);
     }
 
+    /** Restore state before sending a final cosmetic/client refresh. */
     public void applyTo(ServerPlayer player, GameProfile profileToApply) {
-        String stage = "profile refresh";
+        boolean changedDimension = applyState(player, profileToApply);
+        finishRestore(player, changedDimension);
+    }
+
+    public boolean applyState(ServerPlayer player, GameProfile profileToApply) {
+        String stage = "prepare";
+        boolean changedDimension = player.level() != level;
         try {
-        PlayerSkinRefresher.applyProfileAndRefresh(player, profileToApply);
-        stage = "inventory restore";
-        applyInventory(player);
-        stage = "ender chest restore";
-        applyEnderChest(player);
-        stage = "health, food and experience restore";
-        player.setHealth(health);
-        FoodData food = player.getFoodData();
-        food.readAdditionalSaveData(TagValueInput.create(ProblemReporter.DISCARDING, player.registryAccess(), foodData.copy()));
-        player.experienceLevel = experienceLevel;
-        player.setExperienceLevels(experienceLevel);
-        player.totalExperience = totalExperience;
-        stage = "game mode and potion effects restore";
-        player.setGameMode(gameMode);
-        player.removeAllEffects();
-        for (MobEffectInstance effect : effects) {
-            player.addEffect(new MobEffectInstance(effect));
-        }
-        stage = "position and attribute restore";
-        player.getInventory().setSelectedSlot(selectedSlot);
-        player.teleportTo(level, x, y, z, Set.of(), yRot, xRot, true);
+            // Do not carry open containers or riding relationships across bodies.
+            player.closeContainer();
+            player.stopRiding();
+            player.ejectPassengers();
+            if (player.isSleeping()) player.stopSleepInBed(true, true);
 
-        player.getAttributes().apply(attributes);
+            stage = "profile update";
+            PlayerSkinRefresher.applyProfile(player, profileToApply);
 
-        if (!entityData.isEmpty()) {
-            player.getEntityData().assignValues(entityData);
-        }
+            // The broad NBT load invokes vanilla and modded save-data readers.
+            // Apply it before explicit snapshot fields, never after the final teleport.
+            stage = "additional player NBT restore";
+            player.readAdditionalSaveData(TagValueInput.create(ProblemReporter.DISCARDING, player.registryAccess(), additionalData.copy()));
 
-        stage = "additional player NBT restore";
-        player.readAdditionalSaveData(TagValueInput.create(ProblemReporter.DISCARDING, player.registryAccess(), additionalData.copy()));
+            stage = "game mode, attributes and effects";
+            player.setGameMode(gameMode);
+            player.removeAllEffects();
+            player.getAttributes().apply(attributes);
+            for (MobEffectInstance effect : effects) {
+                player.addEffect(new MobEffectInstance(effect));
+            }
 
-        stage = "vehicle and sleep restore";
-        applyRiding(player);
-        if (isAsleep != null) {
-            player.startSleepInBed(isAsleep);
-        } else {
-            player.clearSleepingPos();
-            player.stopSleepInBed(true, true);
-        }
-        this.level.updateSleepingPlayerList();
-        player.inventoryMenu.broadcastChanges();
+            stage = "inventory, food, health and experience";
+            applyInventory(player);
+            applyEnderChest(player);
+            player.getInventory().setSelectedSlot(selectedSlot);
+            player.setHealth(health);
+            player.getFoodData().readAdditionalSaveData(TagValueInput.create(
+                    ProblemReporter.DISCARDING, player.registryAccess(), foodData.copy()));
+            player.experienceLevel = experienceLevel;
+            player.experienceProgress = experienceProgress;
+            player.totalExperience = totalExperience;
 
-        if (fallFlying) player.startFallFlying(); else player.stopFallFlying();
+            stage = "entity and cosmetic data";
+            if (!entityData.isEmpty()) player.getEntityData().assignValues(entityData);
+            player.setMainArm(mainArm);
 
-        player.wonGame = wonGame;
+            stage = "final teleport";
+            player.teleportTo(level, x, y, z, Set.of(), yRot, xRot, true);
+            // A fake player's connection also maintains its own movement baseline.
+            player.connection.resetPosition();
+            player.level().getChunkSource().move(player);
 
-        stage = "statistics restore";
-        for (Map.Entry<Stat<?>, Integer> entry : stats.stats.object2IntEntrySet()) {
-            player.getStats().setValue(player, entry.getKey(), entry.getValue());
-        }
-        player.getStats().sendStats(player);
-        player.getStats().markAllDirty();
+            stage = "riding and sleep";
+            applyRiding(player);
+            if (isAsleep != null) {
+                player.startSleepInBed(isAsleep);
+            } else if (player.isSleeping()) {
+                player.stopSleepInBed(true, true);
+            }
+            player.level().updateSleepingPlayerList();
 
-        stage = "player cosmetic and chat session restore";
-        player.setMainArm(mainArm);
+            if (fallFlying) player.startFallFlying(); else player.stopFallFlying();
+            player.wonGame = wonGame;
 
-        // Authenticated chat keys are signed for a specific UUID. Never copy the
-        // chat session to a different player during an identity/state swap.
+            stage = "statistics restore";
+            // Copy counters, not the mutable ServerStatsCounter reference. Clear
+            // values that were only present on the previous body.
+            for (Stat<?> stat : new HashSet<>(player.getStats().stats.keySet())) {
+                if (!stats.containsKey(stat)) player.getStats().setValue(player, stat, 0);
+            }
+            for (Map.Entry<Stat<?>, Integer> entry : stats.entrySet()) {
+                player.getStats().setValue(player, entry.getKey(), entry.getValue());
+            }
+            player.getStats().markAllDirty();
 
-        stage = "player abilities restore";
-        Abilities dst = player.getAbilities();
-        dst.invulnerable = abilities.invulnerable;
-        dst.flying = abilities.flying;
-        dst.mayfly = abilities.mayfly;
-        dst.instabuild = abilities.instabuild;
-        dst.setWalkingSpeed(abilities.getWalkingSpeed());
-        dst.setFlyingSpeed(abilities.getFlyingSpeed());
-        player.onUpdateAbilities();
+            stage = "abilities restore";
+            Abilities dst = player.getAbilities();
+            dst.invulnerable = abilities.invulnerable;
+            dst.flying = abilities.flying;
+            dst.mayfly = abilities.mayfly;
+            dst.instabuild = abilities.instabuild;
+            dst.mayBuild = abilities.mayBuild;
+            dst.setWalkingSpeed(abilities.getWalkingSpeed());
+            dst.setFlyingSpeed(abilities.getFlyingSpeed());
+
+            // Authenticated chat sessions belong to the connection UUID and are not copied.
+            return changedDimension;
         } catch (RuntimeException exception) {
             ml.mypals.controlPlayer.PlayerControl.LOGGER.error(
                     "Failed restoring player snapshot at stage '{}' for player {}", stage, player.getUUID(), exception);
             throw exception;
         }
+    }
+
+    public void finishRestore(ServerPlayer player, boolean changedDimension) {
+        PlayerSkinRefresher.refreshAfterRestore(player, changedDimension);
+        player.inventoryMenu.broadcastFullState();
+        player.onUpdateAbilities();
+        player.connection.send(new ClientboundSetExperiencePacket(
+                player.experienceProgress, player.totalExperience, player.experienceLevel));
+        player.getStats().sendStats(player);
+    }
+
+    /** Concise state diagnostics without logging item NBT or private inventory contents. */
+    public String describe() {
+        long occupied = inventoryItems.stream().filter(stack -> !stack.isEmpty()).count();
+        long itemCount = inventoryItems.stream().mapToLong(ItemStack::getCount).sum();
+        return String.format(java.util.Locale.ROOT,
+                "%s %s pos=(%.3f, %.3f, %.3f) rot=(%.1f, %.1f) slots=%d items=%d xp=%d/%.3f total=%d",
+                gameProfile.name(), level.dimension(), x, y, z, yRot, xRot,
+                occupied, itemCount, experienceLevel, experienceProgress, totalExperience);
     }
 
     private void applyInventory(ServerPlayer player) {
@@ -283,7 +322,7 @@ public class SwapSnapshot {
         GameProfile gameProfile;
         boolean fallFlying;
         boolean wonGame;
-        ServerStatsCounter stats;
+        Map<Stat<?>, Integer> stats;
         List<AttributeInstance.Packed> attributes;
         HumanoidArm mainArm;
         ServerGamePacketListenerImpl connection;

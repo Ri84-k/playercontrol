@@ -1,6 +1,7 @@
 package ml.mypals.controlPlayer.skin;
 
 import com.google.common.collect.ImmutableMultimap;
+import carpet.patches.EntityPlayerMPFake;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import com.mojang.authlib.properties.PropertyMap;
@@ -23,7 +24,7 @@ public class PlayerSkinRefresher {
 
     private static final String TEXTURES_KEY = "textures";
 
-    public static void applyProfileAndRefresh(ServerPlayer player, GameProfile newProfile) {
+    public static void applyProfile(ServerPlayer player, GameProfile newProfile) {
         GameProfile current = player.getGameProfile();
         // Authlib 26.2 exposes PropertyMap as immutable. Build all entries first,
         // then construct the immutable PropertyMap in one step.
@@ -47,49 +48,41 @@ public class PlayerSkinRefresher {
                 ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(Collections.singleton(player))
         )));
 
-        refreshEntityTracking(player);
-        if (!player.isDeadOrDying()) {
-            ServerLevel level = player.level();
+    }
 
-            player.connection.send(new ClientboundBundlePacket(List.of(
-                    new ClientboundRespawnPacket(
-                            player.createCommonSpawnInfo(level),
-                            ClientboundRespawnPacket.KEEP_ALL_DATA
-                    ),
-                    new ClientboundGameEventPacket(
-                            ClientboundGameEventPacket.LEVEL_CHUNKS_LOAD_START,
-                            0
-                    )
-            )));
-
-            // 重新同步位置（Respawn 包会重置客户端的坐标）
-            player.connection.teleport(
-                    player.getX(), player.getY(), player.getZ(),
-                    player.getYRot(), player.getXRot()
-            );
-
+    public static void refreshAfterRestore(ServerPlayer player, boolean changedDimension) {
+        PlayerList playerList = Objects.requireNonNull(player.level().getServer()).getPlayerList();
+        ServerLevel level = player.level();
+        boolean fake = player instanceof EntityPlayerMPFake;
+        if (!fake && !player.isDeadOrDying()) {
+            // A real cross-dimension teleport already sends a respawn packet.
+            // For a same-dimension swap, refresh the local cosmetic profile only
+            // after all snapshot state is final, then send its actual position.
+            if (!changedDimension && !player.isPassenger() && !player.isVehicle() && !player.isSleeping()) {
+                player.connection.send(new ClientboundBundlePacket(List.of(
+                        new ClientboundRespawnPacket(
+                                player.createCommonSpawnInfo(level),
+                                ClientboundRespawnPacket.KEEP_ALL_DATA
+                        ),
+                        new ClientboundGameEventPacket(
+                                ClientboundGameEventPacket.LEVEL_CHUNKS_LOAD_START, 0)
+                )));
+                player.connection.teleport(player.getX(), player.getY(), player.getZ(),
+                        player.getYRot(), player.getXRot());
+            }
             player.connection.send(new ClientboundSetEntityMotionPacket(player));
-
-            if (player.getVehicle() != null) {
-                player.connection.send(new ClientboundSetPassengersPacket(player.getVehicle()));
-            }
-            if (!player.getPassengers().isEmpty()) {
-                player.connection.send(new ClientboundSetPassengersPacket(player));
-            }
-
-            player.onUpdateAbilities();
-            player.giveExperiencePoints(0); // 刷新经验条
-            playerList.sendPlayerPermissionLevel(player);
             playerList.sendLevelInfo(player, level);
             playerList.sendAllPlayerInfo(player);
-
-            // 重发药水效果
             for (var effect : player.getActiveEffects()) {
-                player.connection.send(new ClientboundUpdateMobEffectPacket(
-                        player.getId(), effect, false
-                ));
+                player.connection.send(new ClientboundUpdateMobEffectPacket(player.getId(), effect, false));
             }
         }
+        // Never send a synthetic respawn or a direct passenger packet to a fake
+        // connection. Let normal entity tracking supply passenger relationships.
+        player.connection.resetPosition();
+        level.getChunkSource().move(player);
+        refreshEntityTracking(player);
+        playerList.sendPlayerPermissionLevel(player);
     }
 
     private static void refreshEntityTracking(ServerPlayer player) {
@@ -102,12 +95,6 @@ public class PlayerSkinRefresher {
             ServerPlayer observer = conn.getPlayer();
             tracked.invokeRemovePlayer(observer);
 
-            TrackedEntityAccessor observerTracked = (TrackedEntityAccessor)
-                    chunkMap.entityMap.get(observer.getId());
-            if (observerTracked != null) {
-                observerTracked.invokeRemovePlayer(player);
-                observerTracked.invokeUpdatePlayer(player);
-            }
             tracked.invokeUpdatePlayer(observer);
         }
     }

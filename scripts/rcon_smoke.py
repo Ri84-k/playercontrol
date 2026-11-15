@@ -4,6 +4,8 @@ from __future__ import annotations
 import socket
 import struct
 import time
+import re
+import uuid
 from pathlib import Path
 
 
@@ -55,6 +57,25 @@ class Rcon:
         raise RuntimeError(f"No RCON response for {text}")
 
 
+def entity_uuid(rcon: Rcon, name: str) -> str:
+    output = rcon.command(f"data get entity {name} UUID")
+    match = re.search(r"\[I;\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\d+)\]", output)
+    if not match:
+        raise RuntimeError(f"Could not read UUID for {name}: {output}")
+    value = 0
+    for part in match.groups():
+        value = (value << 32) | (int(part) & 0xFFFFFFFF)
+    return str(uuid.UUID(int=value))
+
+
+def position(rcon: Rcon, entity: str) -> tuple[float, float, float]:
+    output = rcon.command(f"data get entity {entity} Pos")
+    match = re.search(r"\[(-?[\d.]+)d,\s*(-?[\d.]+)d,\s*(-?[\d.]+)d\]", output)
+    if not match:
+        raise RuntimeError(f"Could not read position: {output}")
+    return tuple(map(float, match.groups()))
+
+
 def main() -> None:
     settings = Path("run/server.properties").read_text(encoding="utf-8").splitlines()
     password = next(line.partition("=")[2] for line in settings if line.startswith("rcon.password="))
@@ -72,6 +93,15 @@ def main() -> None:
             raise RuntimeError("Carpet did not spawn both fake players")
         time.sleep(3)
 
+    # Use immutable UUIDs when referring to actual entities across a profile swap.
+    uid_a = entity_uuid(rcon, "TestBotA")
+    uid_b = entity_uuid(rcon, "TestBotB")
+    rcon.command(f"execute as {uid_a} run gamemode creative @s")
+    rcon.command(f"execute as {uid_b} run gamemode creative @s")
+    rcon.command(f"tp {uid_a} 0 200 0")
+    rcon.command(f"tp {uid_b} 10 200 0")
+    # Keep the fixtures on separate platforms so gravity cannot affect position assertions.
+    rcon.command("fill -2 199 -2 25 199 2 minecraft:stone")
     # Each fake player gets a distinct item to check inventory ownership.
     rcon.command("item replace entity TestBotA hotbar.0 with minecraft:diamond 3")
     rcon.command("item replace entity TestBotB hotbar.0 with minecraft:emerald 5")
@@ -83,9 +113,28 @@ def main() -> None:
     # the player visible as TestBotB holds TestBotB's original inventory.
     swapped_items = rcon.command("clear TestBotB minecraft:emerald 0")
     swapped_other_items = rcon.command("clear TestBotA minecraft:diamond 0")
-    restored = rcon.command("execute as TestBotA run controlPlayer release")
-    final = rcon.command("execute as TestBotA run controlPlayer status")
-    restored_items = rcon.command("clear TestBotA minecraft:diamond 0")
+    # Move and modify the entity that is controlling B, then release by UUID.
+    # The resulting state must belong to B, not B's old spawn snapshot.
+    rcon.command(f"tp {uid_a} 20 200 0")
+    rcon.command(f"item replace entity {uid_a} hotbar.0 with minecraft:emerald 7")
+    rcon.command(f"execute as {uid_a} run experience set @s 12 levels")
+    rcon.command(f"execute as {uid_a} run experience set @s 5 points")
+    initial_levels = rcon.command(f"execute as {uid_a} run experience query @s levels")
+    initial_points = rcon.command(f"execute as {uid_a} run experience query @s points")
+    if not re.search(r"\b12\b", initial_levels) or not re.search(r"\b5\b", initial_points):
+        raise RuntimeError(f"Could not initialize XP fixture: {initial_levels!r} / {initial_points!r}")
+    changed_position = position(rcon, uid_a)
+    restored = rcon.command(f"execute as {uid_a} run controlPlayer release")
+    final = rcon.command(f"execute as {uid_a} run controlPlayer status")
+    restored_items = rcon.command(f"execute as {uid_a} run clear @s minecraft:diamond 0")
+    latest_items = rcon.command(f"execute as {uid_b} run clear @s minecraft:emerald 0")
+    final_position = position(rcon, uid_b)
+    final_levels = rcon.command(f"execute as {uid_b} run experience query @s levels")
+    final_points = rcon.command(f"execute as {uid_b} run experience query @s points")
+    if any(abs(a - b) > 0.1 for a, b in zip(changed_position, final_position)):
+        raise RuntimeError(f"Fake player position reset: {changed_position} -> {final_position}")
+    if not re.search(r"\b12\b", final_levels) or not re.search(r"\b5\b", final_points):
+        raise RuntimeError(f"Latest XP did not transfer: {final_levels!r} / {final_points!r}")
 
     bad = ("unknown or incomplete command", "an unexpected error", "could not execute")
     for name, output in (("initial status", before), ("swap", swapped), ("swapped status", after),
@@ -102,8 +151,9 @@ def main() -> None:
     for description, result, amount in (("before swap", initial_items, "3"),
                                         ("during swap - renamed B", swapped_items, "5"),
                                         ("during swap - renamed A", swapped_other_items, "3"),
-                                        ("after release", restored_items, "3")):
-        if amount not in result or "found" not in result.lower():
+                                        ("after release", restored_items, "3"),
+                                        ("latest fake inventory", latest_items, "7")):
+        if not re.search(rf"\b{amount}\b", result) or "found" not in result.lower():
             raise RuntimeError(f"Inventory item check failed {description}: {result!r}")
 
     # Validate the Carpet commands exposed by the new Spawn Player / Actions UI.
